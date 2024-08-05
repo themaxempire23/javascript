@@ -1,2 +1,3 @@
- // js comment on js 1st code
- console.log('Hello Javascript');
+//Declaring variables
+ let name = 'hello';
+ consoles.log(name);
