@@ -1,0 +1,11 @@
+{
+  "name": "pdfextractor",
+  "version": "1.0.0",
+  "description": "extracting pdf text usng pdf.js",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "",
+  "license": "ISC"
+}
