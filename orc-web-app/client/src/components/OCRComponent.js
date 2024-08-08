@@ -1,9 +1,9 @@
 import React, { useState } from 'react';
 import Tesseract from 'tesseract.js';
 import { getDocument, GlobalWorkerOptions } from 'pdfjs-dist/legacy/build/pdf';
-import './OCRComponent.css'; // Import a CSS file for styling
+import './OCRComponent.css'; // Importing the a CSS file for styling
 
-GlobalWorkerOptions.workerSrc = `${process.env.PUBLIC_URL}/pdf.worker.min.js`;
+GlobalWorkerOptions.workerSrc = `${process.env.PUBLIC_URL}/pdf.worker.min.mjs`;
 
 const OCRComponent = () => {
   const [ocrText, setOcrText] = useState('');

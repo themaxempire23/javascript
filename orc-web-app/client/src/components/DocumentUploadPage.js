@@ -4,7 +4,8 @@ import OCRComponent from './OCRComponent';
 const DocumentUploadPage = () => {
   return (
     <div>
-      <h1>Upload Image or PDF - OCR Tool</h1>
+        <h1>OCR demo</h1>
+      <h1>Upload a Image or PDF</h1>
       <OCRComponent />
     </div>
   );
