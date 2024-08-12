@@ -12,3 +12,4 @@ const DocumentUploadPage = () => {
 };
 
 export default DocumentUploadPage;
+
