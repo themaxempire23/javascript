@@ -35,22 +35,37 @@ const OCRComponent = () => {
         canvas.width = viewport.width;
 
         await page.render({ canvasContext: context, viewport }).promise;
+
+        // Define region of interest (ROI) for docket number
+        const roiCanvas = document.createElement('canvas');
+        const roiContext = roiCanvas.getContext('2d');
+        const roiX = 1500; // X coordinate of ROI (Adjust as needed)
+        const roiY = 300;  // Y coordinate of ROI (Adjust as needed)
+        const roiWidth = 300; // Width of ROI (Adjust as needed)
+        const roiHeight = 100; // Height of ROI (Adjust as needed)
+
+        roiCanvas.width = roiWidth;
+        roiCanvas.height = roiHeight;
+
+        roiContext.drawImage(canvas, roiX, roiY, roiWidth, roiHeight, 0, 0, roiWidth, roiHeight);
+
         const text = await Tesseract.recognize(
-          canvas,
+          roiCanvas,
           'eng',
           {
             logger: m => {
               if (m.status === 'recognizing text') {
                 setProgress((pageNum - 1) / pdf.numPages + m.progress / pdf.numPages);
               }
-            }
+            },
+            tessedit_char_whitelist: '0123456789' // Restrict OCR to digits only
           }
         ).then(({ data: { text } }) => text);
 
         allText += text + '\n\n';
       }
 
-      setOcrText(allText);
+      setOcrText(allText.trim());
     } else {
       Tesseract.recognize(
         file,
@@ -60,10 +75,11 @@ const OCRComponent = () => {
             if (m.status === 'recognizing text') {
               setProgress(m.progress);
             }
-          }
+          },
+          tessedit_char_whitelist: '0123456789' // Restrict OCR to digits only
         }
       ).then(({ data: { text } }) => {
-        setOcrText(text);
+        setOcrText(text.trim());
       });
     }
 
