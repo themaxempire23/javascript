@@ -23,34 +23,36 @@ const OCRComponent = () => {
 
     if (file.type === 'application/pdf') {
       const pdf = await getDocument(URL.createObjectURL(file)).promise;
-      let allText = '';
 
-      for (let pageNum = 1; pageNum <= pdf.numPages; pageNum++) {
-        const page = await pdf.getPage(pageNum);
-        const viewport = page.getViewport({ scale: 2 });
-        const canvas = document.createElement('canvas');
-        const context = canvas.getContext('2d');
-        canvas.height = viewport.height;
-        canvas.width = viewport.width;
+      const page = await pdf.getPage(1); // Only process the first page
+      const viewport = page.getViewport({ scale: 2 });
+      const canvas = document.createElement('canvas');
+      const context = canvas.getContext('2d');
+      canvas.height = viewport.height;
+      canvas.width = viewport.width;
 
-        await page.render({ canvasContext: context, viewport }).promise;
-        const text = await Tesseract.recognize(
-          canvas,
-          'eng',
-          {
-            logger: m => {
-              if (m.status === 'recognizing text') {
-                setProgress((pageNum - 1) / pdf.numPages + m.progress / pdf.numPages);
-              }
+      await page.render({ canvasContext: context, viewport }).promise;
+
+      // Run OCR on the entire page
+      const text = await Tesseract.recognize(
+        canvas,
+        'eng',
+        {
+          logger: m => {
+            if (m.status === 'recognizing text') {
+              setProgress(m.progress);
             }
           }
-        ).then(({ data: { text } }) => text);
+        }
+      ).then(({ data: { text } }) => text);
 
-        allText += text + '\n\n';
-      }
+      // Use regex to extract the docket number, ignoring numbers with hyphens
+      const docketNumberMatch = text.match(/\b\d{7,8}\b(?!-)/); // Matches 7 or 8 digit numbers that do not have hyphens
+      const docketNumber = docketNumberMatch ? docketNumberMatch[0] : 'Docket number not found';
 
-      setOcrText(allText);
+      setOcrText(`Docket Number is: ${docketNumber}`);
     } else {
+      // Handle image files (e.g., PNG, JPG)
       Tesseract.recognize(
         file,
         'eng',
@@ -62,7 +64,10 @@ const OCRComponent = () => {
           }
         }
       ).then(({ data: { text } }) => {
-        setOcrText(text);
+        // Use regex to extract the docket number, ignoring numbers with hyphens
+        const docketNumberMatch = text.match(/\b\d{7,8}\b(?!-)/); // Matches 7 or 8 digit numbers that do not have hyphens
+        const docketNumber = docketNumberMatch ? docketNumberMatch[0] : 'Docket number not found';
+        setOcrText(`Docket Number is: ${docketNumber}`);
       });
     }
 
