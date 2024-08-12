@@ -15,6 +15,7 @@ const OCRComponent = () => {
     setProgress(0); // Reset progress on new file upload
     const file = event.target.files[0];
     setOcrText('');
+    
 
     if (!file) {
       setIsLoading(false);
