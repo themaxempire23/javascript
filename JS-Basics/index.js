@@ -5,6 +5,10 @@
  let personMan = 'max';
  console.log(personMan);
 
+ let personMan = 'max';
+ console.log(personMan);
+
+
  // Cannot be a reversed keyword
  // Should be meaningfull e.g not x, y, z, etc
  // Cannot stat with a number (1name)
