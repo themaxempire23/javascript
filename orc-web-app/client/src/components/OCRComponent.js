@@ -102,7 +102,7 @@ const OCRComponent = () => {
       <textarea value={ocrText} readOnly className="ocr-result"></textarea>
       {uploadedFilePath && (
         <a href={`http://localhost:3001${uploadedFilePath}`} target="_blank" rel="noopener noreferrer">
-          <button>Click here to view Document</button>
+          <button>View Document</button>
         </a>
       )}
       {isLoading && <p>Processing, please wait...</p>}
