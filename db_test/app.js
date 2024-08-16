@@ -9,5 +9,5 @@ const db = mysql.createConnection({
     host: 'localhost',
     user: 'root',
     password: 'Hacker99',
-    database: 'studentdb'
+    database: 'testdb'
 })
