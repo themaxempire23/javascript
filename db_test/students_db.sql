@@ -10,3 +10,5 @@ grade varchar(10) not null
 );
 
 select * from students;
+
+select * from students;
