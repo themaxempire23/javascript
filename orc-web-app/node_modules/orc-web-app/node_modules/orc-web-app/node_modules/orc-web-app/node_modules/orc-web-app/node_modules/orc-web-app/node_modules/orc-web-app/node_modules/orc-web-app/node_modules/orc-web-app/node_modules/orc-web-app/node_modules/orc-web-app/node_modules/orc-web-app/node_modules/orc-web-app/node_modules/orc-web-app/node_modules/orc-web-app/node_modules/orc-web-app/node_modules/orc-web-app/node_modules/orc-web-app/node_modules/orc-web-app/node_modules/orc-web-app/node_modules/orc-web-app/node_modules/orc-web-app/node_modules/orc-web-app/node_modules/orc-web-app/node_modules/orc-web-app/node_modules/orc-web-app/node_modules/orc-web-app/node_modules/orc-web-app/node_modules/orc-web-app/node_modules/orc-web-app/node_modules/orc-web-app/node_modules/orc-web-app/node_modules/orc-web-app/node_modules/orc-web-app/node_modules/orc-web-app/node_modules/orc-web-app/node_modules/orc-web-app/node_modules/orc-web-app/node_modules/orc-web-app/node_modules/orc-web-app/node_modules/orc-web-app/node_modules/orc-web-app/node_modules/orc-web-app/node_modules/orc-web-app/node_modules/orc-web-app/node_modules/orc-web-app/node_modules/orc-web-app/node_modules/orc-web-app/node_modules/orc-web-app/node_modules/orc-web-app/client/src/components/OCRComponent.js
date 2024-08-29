@@ -90,13 +90,13 @@ const OCRComponent = () => {
   };
 
   const handleViewDocument = () => {
-    if (uploadedFilePath) {
-      // Extract just the file path relative to the 'uploads' directory
-      const relativePath = uploadedFilePath.replace(/^[a-zA-Z]:\\.*\\orc-web-app\\uploads/, '/uploads');
-      window.open(`http://localhost:3001${relativePath}`, '_blank'); // Open the document in a new tab
-    }
-  };
-  
+  if (uploadedFilePath) {
+    // Extract just the file path relative to the 'uploads' directory
+    const relativePath = uploadedFilePath.replace(/^[a-zA-Z]:\\.*\\orc-web-app\\uploads/, '/uploads');
+    window.open(`http://localhost:3001${relativePath}`, '_blank'); // Open the document in a new tab
+  }
+};
+
 
   return (
     <div className="ocr-container">
