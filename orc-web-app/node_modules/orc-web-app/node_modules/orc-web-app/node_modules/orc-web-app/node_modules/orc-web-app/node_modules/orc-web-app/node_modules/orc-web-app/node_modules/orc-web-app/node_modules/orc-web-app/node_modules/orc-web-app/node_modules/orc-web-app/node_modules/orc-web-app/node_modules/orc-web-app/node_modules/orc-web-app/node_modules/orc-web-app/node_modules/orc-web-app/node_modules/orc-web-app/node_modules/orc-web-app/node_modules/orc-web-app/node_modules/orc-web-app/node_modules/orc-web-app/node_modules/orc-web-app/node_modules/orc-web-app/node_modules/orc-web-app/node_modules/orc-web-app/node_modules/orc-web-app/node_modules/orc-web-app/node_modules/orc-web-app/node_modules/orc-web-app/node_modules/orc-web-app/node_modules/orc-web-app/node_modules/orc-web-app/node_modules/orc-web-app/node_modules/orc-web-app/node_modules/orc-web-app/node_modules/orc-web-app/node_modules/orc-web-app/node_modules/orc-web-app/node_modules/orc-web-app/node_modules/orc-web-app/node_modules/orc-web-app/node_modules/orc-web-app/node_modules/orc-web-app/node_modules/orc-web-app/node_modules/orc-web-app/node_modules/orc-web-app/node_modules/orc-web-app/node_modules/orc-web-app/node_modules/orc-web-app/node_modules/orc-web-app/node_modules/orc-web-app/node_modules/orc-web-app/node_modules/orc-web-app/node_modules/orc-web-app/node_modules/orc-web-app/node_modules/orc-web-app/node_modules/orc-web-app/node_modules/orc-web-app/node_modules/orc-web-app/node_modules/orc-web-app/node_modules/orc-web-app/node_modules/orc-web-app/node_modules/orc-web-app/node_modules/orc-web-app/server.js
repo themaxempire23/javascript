@@ -19,7 +19,7 @@ const db = mysql.createConnection({
   host: 'localhost',
   user: 'root',  // Replace with your MySQL username
   password: 'Hacker99',  // Replace with your MySQL password
-  database: 'ocr_db'  // Replace with your MySQL database name
+  database: 'ocr_db'  // Replace with your MySQL database name this is going to be my dab name
 });
 
 db.connect((err) => {

@@ -35,7 +35,6 @@ const OCRComponent = () => {
 
       const filePath = response.data.filePath;
       setUploadedFilePath(filePath);
-      console.log("Uploaded file path:", uploadedFilePath);
 
       if (file.type === 'application/pdf') {
         const pdf = await getDocument(URL.createObjectURL(file)).promise;
@@ -90,15 +89,22 @@ const OCRComponent = () => {
     setIsLoading(false);
   };
 
+  const handleViewDocument = () => {
+    if (uploadedFilePath) {
+      // Extract just the file path relative to the 'uploads' directory
+      const relativePath = uploadedFilePath.replace(/^[a-zA-Z]:\\.*\\orc-web-app\\uploads/, '/uploads');
+      window.open(`http://localhost:3001${relativePath}`, '_blank'); // Open the document in a new tab
+    }
+  };
+  
+
   return (
     <div className="ocr-container">
       <input type="file" onChange={handleFileChange} accept="image/*,application/pdf" className="file-input" />
       {isLoading && <div className="progress-bar" style={{ width: `${progress * 100}%` }}></div>}
       <textarea value={ocrText} readOnly className="ocr-result"></textarea>
       {uploadedFilePath && (
-        <a href={`${window.location.origin}${uploadedFilePath}`} target="_blank" rel="noopener noreferrer">
-          <button>View Document</button>
-        </a>
+        <button onClick={handleViewDocument}>View Document</button>
       )}
       {isLoading && <p>Processing, please wait...</p>}
     </div>
