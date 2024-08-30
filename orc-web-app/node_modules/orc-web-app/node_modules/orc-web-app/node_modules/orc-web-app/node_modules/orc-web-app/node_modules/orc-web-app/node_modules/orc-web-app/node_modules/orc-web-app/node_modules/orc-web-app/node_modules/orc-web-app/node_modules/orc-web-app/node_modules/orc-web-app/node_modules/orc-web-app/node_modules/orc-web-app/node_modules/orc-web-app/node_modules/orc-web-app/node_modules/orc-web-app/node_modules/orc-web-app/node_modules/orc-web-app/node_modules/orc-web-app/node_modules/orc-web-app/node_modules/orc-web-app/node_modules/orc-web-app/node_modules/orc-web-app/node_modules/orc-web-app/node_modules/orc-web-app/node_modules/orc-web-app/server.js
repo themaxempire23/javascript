@@ -1,25 +1,18 @@
-const express = require('express');
-const multer = require('multer');
-const path = require('path');
-const cors = require('cors');
-const mysql = require('mysql2');
+
 const fs = require('fs');
+const path = require('path');
+const chokidar = require('chokidar');
+const mysql = require('mysql2');
 const Tesseract = require('tesseract.js');
-const { createCanvas } = require('canvas'); // Use canvas for node environment
+const { createCanvas } = require('canvas');
 const { pathToFileURL } = require('url');
 
-const app = express();
-const PORT = process.env.PORT || 3001;
 
-// Use CORS to allow requests from your React frontend
-app.use(cors());
-
-// Set up MySQL connection
 const db = mysql.createConnection({
   host: 'localhost',
-  user: 'root',  // Replace with your MySQL username
-  password: 'Hacker99',  // Replace with your MySQL password
-  database: 'ocr_db'  // Replace with your MySQL database name this is going to be my dab name
+  user: 'root',
+  password: 'Hacker99',
+  database: 'ocr_db'
 });
 
 db.connect((err) => {
@@ -27,35 +20,30 @@ db.connect((err) => {
   console.log('Connected to MySQL database');
 });
 
-// Set up storage for uploaded files
-const storage = multer.diskStorage({
-  destination: (req, file, cb) => {
-    cb(null, path.join(__dirname, 'uploads')); // Save files to 'uploads' directory
-  },
-  filename: (req, file, cb) => {
-    const originalName = file.originalname;
-    cb(null, Date.now() + '-' + originalName); // Ensure unique filenames initially
-  }
-});
+//----- Here are the source & final directories------------//
 
-const upload = multer({ storage });
+const sourceDir = path.join(__dirname, 'source');
+const finalDir = path.join(__dirname, 'final');
 
-// Helper function to dynamically import pdfjs-dist and extract docket number
+// Ensure final directory exists
+if (!fs.existsSync(finalDir)) {
+  fs.mkdirSync(finalDir);
+}
+
+//------------ OCR Magic helper function -------------//
 async function extractDocketNumber(filePath) {
   try {
     const fileType = path.extname(filePath);
     let text = '';
 
-    // Convert absolute path to file URL for dynamic import
-    const pdfjsLib = await import(pathToFileURL(path.join(__dirname, 'node_modules', 'pdfjs-dist', 'legacy', 'build', 'pdf.mjs')).href);
-    pdfjsLib.GlobalWorkerOptions.workerSrc = pathToFileURL(path.join(__dirname, 'node_modules', 'pdfjs-dist', 'legacy', 'build', 'pdf.worker.mjs')).href;
-
     if (fileType === '.pdf') {
+      const pdfjsLib = await import(pathToFileURL(path.join(__dirname, 'node_modules', 'pdfjs-dist', 'legacy', 'build', 'pdf.mjs')).href);
+      pdfjsLib.GlobalWorkerOptions.workerSrc = pathToFileURL(path.join(__dirname, 'node_modules', 'pdfjs-dist', 'legacy', 'build', 'pdf.worker.mjs')).href;
+
       const pdf = await pdfjsLib.getDocument(filePath).promise;
       const page = await pdf.getPage(1);
       const viewport = page.getViewport({ scale: 2 });
 
-      // Create a canvas for rendering
       const canvas = createCanvas(viewport.width, viewport.height);
       const context = canvas.getContext('2d');
 
@@ -66,15 +54,12 @@ async function extractDocketNumber(filePath) {
 
       await page.render(renderContext).promise;
 
-      // Use Tesseract.js to recognize text from the rendered image
       text = await Tesseract.recognize(canvas.toBuffer(), 'eng').then(({ data: { text } }) => text);
     } else {
-      // Handle non-PDF files (e.g., image files)
       text = await Tesseract.recognize(filePath, 'eng').then(({ data: { text } }) => text);
     }
 
-    // Extract the docket number using regex
-    const docketNumberMatch = text.match(/\b\d{7,8}\b(?!-)/); // Matches 7 or 8 digit numbers without hyphens
+    const docketNumberMatch = text.match(/\b\d{7,8}\b(?!-)/);
     return docketNumberMatch ? docketNumberMatch[0] : null;
   } catch (error) {
     console.error('Error during OCR processing:', error);
@@ -82,72 +67,62 @@ async function extractDocketNumber(filePath) {
   }
 }
 
-// Endpoint to handle file uploads
-app.post('/upload', upload.single('file'), async (req, res) => {
-  if (!req.file) {
-    return res.status(400).json({ message: 'No file uploaded' });
-  }
+//--------- How the code is processing a file -------------- //
 
-  const originalFilePath = path.join(__dirname, 'uploads', req.file.filename);
-  const docketNumber = await extractDocketNumber(originalFilePath);
+async function processFile(filePath) {
+  const docketNumber = await extractDocketNumber(filePath);
 
   if (!docketNumber) {
-    fs.unlinkSync(originalFilePath); // Remove the uploaded file if docket number not found
-    return res.status(400).json({ message: 'Docket number not found, file not saved' });
+    console.log(`Docket number not found in file: ${filePath}. Deleting file.`);
+    fs.unlinkSync(filePath);
+    return;
   }
 
-  // Check for duplicate docket number in the database
-  const queryCheck = 'SELECT COUNT(*) AS count FROM files WHERE docketNumber = ?';
-  db.query(queryCheck, [docketNumber], (err, result) => {
+  //---------------- checking if docket number is already in the database-----------//
+
+  db.query('SELECT COUNT(*) AS count FROM files WHERE docketNumber = ?', [docketNumber], (err, result) => {
     if (err) {
       console.error('Error checking for duplicate docket number:', err);
-      return res.status(500).json({ message: 'Database error during duplicate check' });
+      return;
     }
 
     if (result[0].count > 0) {
-      fs.unlinkSync(originalFilePath); // Remove the uploaded file if duplicate found
-      return res.status(400).json({ message: 'Duplicate docket number found, file not saved' });
+      console.log(`Duplicate docket number found (${docketNumber}) in file: ${filePath}. Deleting file.`);
+      fs.unlinkSync(filePath);
+      return;
     }
 
-    // Rename the file with docket number
-    const newFileName = `CON_${docketNumber}.pdf`;
-    const newFilePath = path.join(__dirname, 'uploads', newFileName);
+        //----------Here is the file name format: CON_<DocketNumber>.pdf -------//
 
-    fs.rename(originalFilePath, newFilePath, (err) => {
+    const newFileName = `CON_${docketNumber}.pdf`;
+    const newFilePath = path.join(finalDir, newFileName);
+
+    fs.rename(filePath, newFilePath, (err) => {
       if (err) {
-        console.error('Error renaming file:', err);
-        return res.status(500).json({ message: 'Error renaming file' });
+        console.error('Error renaming/moving file:', err);
+        return;
       }
 
-      // Insert file details into the database
-      const uploadTime = new Date();
-      const queryInsert = 'INSERT INTO files (filePath, uploadedAt, docketNumber) VALUES (?, ?, ?)';
-      db.query(queryInsert, [newFilePath, uploadTime, docketNumber], (err, result) => {
+              //------ inserting file into the database   ------------//
+
+
+      db.query('INSERT INTO files (filePath, uploadedAt, docketNumber) VALUES (?, NOW(), ?)', [newFilePath, docketNumber], (err) => {
         if (err) {
           console.error('Error inserting file details into database:', err);
-          return res.status(500).json({ message: 'Error saving file details to database' });
+          return;
         }
-        res.status(200).json({ message: 'File uploaded and saved successfully', filePath: newFilePath });
+        console.log(`File processed and saved: ${newFilePath}`);
       });
     });
   });
+}
+
+
+const watcher = chokidar.watch(sourceDir, { persistent: true });
+
+watcher.on('add', (filePath) => {
+  console.log(`New file detected: ${filePath}`);
+  processFile(filePath);
 });
 
-// Serve the uploaded files statically
-app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
-
-// Endpoint to list uploaded files
-app.get('/files', (req, res) => {
-  const query = 'SELECT * FROM files';
-  db.query(query, (err, results) => {
-    if (err) {
-      console.error('Error retrieving files from database:', err);
-      return res.status(500).json({ message: 'Error retrieving files' });
-    }
-    res.json(results);
-  });
-});
-
-app.listen(PORT, () => {
-  console.log(`Server listening on port ${PORT}`);
-});
+console.log(`Watching ${sourceDir} for new files...`);
