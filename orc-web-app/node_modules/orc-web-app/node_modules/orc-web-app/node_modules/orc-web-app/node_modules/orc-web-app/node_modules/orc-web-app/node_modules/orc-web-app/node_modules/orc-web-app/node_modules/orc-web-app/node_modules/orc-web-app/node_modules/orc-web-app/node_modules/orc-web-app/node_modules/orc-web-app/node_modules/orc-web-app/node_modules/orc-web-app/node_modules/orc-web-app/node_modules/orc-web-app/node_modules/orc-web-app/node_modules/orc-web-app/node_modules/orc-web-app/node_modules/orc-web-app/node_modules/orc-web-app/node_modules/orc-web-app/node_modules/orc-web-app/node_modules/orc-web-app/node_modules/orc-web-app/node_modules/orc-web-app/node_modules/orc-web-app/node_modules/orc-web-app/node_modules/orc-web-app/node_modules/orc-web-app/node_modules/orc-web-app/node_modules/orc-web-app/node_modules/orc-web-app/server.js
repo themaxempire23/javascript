@@ -111,7 +111,7 @@ async function processFile(filePath) {
           console.error('Error inserting file details into database:', err);
           return;
         }
-        console.log(`File processed and saved: ${newFilePath}`);
+        console.log(`File processed and saved in DB: ${newFilePath}`);
       });
     });
   });
