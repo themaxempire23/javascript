@@ -1,11 +1,27 @@
-
 const fs = require('fs');
 const path = require('path');
 const chokidar = require('chokidar');
 const mysql = require('mysql2');
+const express = require('express');
+const bodyParser = require('body-parser');
 const Tesseract = require('tesseract.js');
 const { createCanvas } = require('canvas');
 const { pathToFileURL } = require('url');
+
+//----- Initializing Express App -----//
+const app = express();
+app.use(bodyParser.json()); //-- Parse JSON bodies --//
+
+// Define Directories
+const sourceDir = path.join(__dirname, 'source');
+const finalDir = path.join(__dirname, 'final');
+
+if (!fs.existsSync(finalDir)) {
+  fs.mkdirSync(finalDir);
+}
+
+// ------- Serve static files from the final directory ---------//
+app.use('/final', express.static(finalDir));
 
 
 const db = mysql.createConnection({
@@ -20,17 +36,7 @@ db.connect((err) => {
   console.log('Connected to MySQL database');
 });
 
-//----- Here are the source & final directories------------//
-
-const sourceDir = path.join(__dirname, 'source');
-const finalDir = path.join(__dirname, 'final');
-
-// Ensure final directory exists
-if (!fs.existsSync(finalDir)) {
-  fs.mkdirSync(finalDir);
-}
-
-//------------ OCR Magic helper function -------------//
+//----------- Helper function to extract docket number using OCR -------- //
 async function extractDocketNumber(filePath) {
   try {
     const fileType = path.extname(filePath);
@@ -67,8 +73,7 @@ async function extractDocketNumber(filePath) {
   }
 }
 
-//--------- How the code is processing a file -------------- //
-
+//---- OCR Magic funtion ----//
 async function processFile(filePath) {
   const docketNumber = await extractDocketNumber(filePath);
 
@@ -77,8 +82,6 @@ async function processFile(filePath) {
     fs.unlinkSync(filePath);
     return;
   }
-
-  //---------------- checking if docket number is already in the database-----------//
 
   db.query('SELECT COUNT(*) AS count FROM files WHERE docketNumber = ?', [docketNumber], (err, result) => {
     if (err) {
@@ -92,8 +95,6 @@ async function processFile(filePath) {
       return;
     }
 
-        //----------Here is the file name format: CON_<DocketNumber>.pdf -------//
-
     const newFileName = `CON_${docketNumber}.pdf`;
     const newFilePath = path.join(finalDir, newFileName);
 
@@ -102,9 +103,6 @@ async function processFile(filePath) {
         console.error('Error renaming/moving file:', err);
         return;
       }
-
-              //------ inserting file into the database   ------------//
-
 
       db.query('INSERT INTO files (filePath, uploadedAt, docketNumber) VALUES (?, NOW(), ?)', [newFilePath, docketNumber], (err) => {
         if (err) {
@@ -117,7 +115,7 @@ async function processFile(filePath) {
   });
 }
 
-
+// Watcher to monitor the source directory
 const watcher = chokidar.watch(sourceDir, { persistent: true });
 
 watcher.on('add', (filePath) => {
@@ -126,3 +124,30 @@ watcher.on('add', (filePath) => {
 });
 
 console.log(`Watching ${sourceDir} for new files...`);
+
+// ------ RESTful API Endpoint ------ //
+
+// -- Search Endpoint to search for a file by docket number ---//
+app.get('/api/files/:docketNumber', (req, res) => {
+  const docketNumber = req.params.docketNumber;
+
+  db.query('SELECT filePath FROM files WHERE docketNumber = ?', [docketNumber], (err, result) => {
+    if (err) {
+      console.error('Database error:', err);
+      return res.status(500).json({ error: 'Internal server error' });
+    }
+
+    if (result.length === 0) {
+      return res.status(404).json({ message: 'File not found' });
+    }
+
+    const filePath = result[0].filePath;
+    res.json({ filePath });
+  });
+});
+
+
+const PORT = process.env.PORT || 3001;
+app.listen(PORT, () => {
+  console.log(`Server running on port ${PORT}`);
+});
