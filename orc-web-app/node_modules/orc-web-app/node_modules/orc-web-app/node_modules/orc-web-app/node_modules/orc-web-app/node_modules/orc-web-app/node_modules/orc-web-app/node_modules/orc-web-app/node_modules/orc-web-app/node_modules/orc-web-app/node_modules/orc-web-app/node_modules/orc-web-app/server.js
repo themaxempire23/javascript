@@ -128,6 +128,8 @@ console.log(`Watching ${sourceDir} for new files...`);
 // ------ RESTful API Endpoint ------ //
 
 // -- Search Endpoint to search for a file by docket number ---//
+
+
 app.get('/api/files/:docketNumber', (req, res) => {
   const docketNumber = req.params.docketNumber;
 
@@ -145,6 +147,28 @@ app.get('/api/files/:docketNumber', (req, res) => {
     res.json({ filePath });
   });
 });
+
+// new
+app.get('/api/files/list', (req, res) => {
+  fs.readdir(finalDir, (err, files) => {
+    if (err) {
+      return res.status(500).json({ error: 'Unable to read final directory' });
+    }
+
+   
+    const docketNumbers = files
+      .filter(file => file.endsWith('.pdf'))
+      .map(file => {
+       
+        const match = file.match(/^CON_(\d{7,8})\.pdf$/);
+        return match ? match[1] : null;
+      })
+      .filter(Boolean); 
+
+    res.json({ docketNumbers });
+  });
+});
+
 
 
 const PORT = process.env.PORT || 3001;
